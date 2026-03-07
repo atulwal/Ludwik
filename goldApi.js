@@ -4,8 +4,8 @@ import { Parser } from '@json2csv/plainjs';
 const yf=new YahooFinance();
 
 //set these parameters first:
-const OUTPUT_FILE = './trainingData/gold_data.csv';
-const symb='gc=f'; //gold futures
+const OUTPUT_FILE = './trainingData/US-10yr-treasury-bond-real_yield.csv';
+const symb='GC=F'; //gold futures
 //Gold Spot: XAUUSD=X  =>	The current market price of gold against the US Dollar.
 //Gold ETF:	GLD	       =>   SPDR Gold Shares (tracks the price of gold bullion).
 const SD='2025-12-01';
@@ -65,7 +65,8 @@ async function goldCurrentPrice(){
     console.log(quote);
     return quote;
 }
-
+// savetoCSV(2000,2011);
+// savetoCSV(2000,2026);
 module.exports={
     history,
     goldCurrentPrice}
