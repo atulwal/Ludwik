@@ -1,4 +1,7 @@
 import { supabase } from './supabaseClient.js';
+import { readFile, readdir } from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 /**
  * Inserts raw tweets into the database, ignoring duplicates.
@@ -134,35 +137,54 @@ export async function markTweetsAsProcessed(tweetIds) {
 
 //Batch updating function for raw tweets database for training data
 
-export async function HistoricRawTweetupdating(){
 
-    fetch('../ingestion/returesBiz_2007to2010.json')
-    .then((result)=>{
-        result.json();
-    })
-    .then((data)=>{
-        console.log( `fetched object succesfully`);
-        //JS object
-        for(entries in data.instructions){
-        for(tweet in entries){
-        const formattedTweets={
-            timestamp:tweet.content.tweet_results.legacy.created_at,
-            content:tweet.content.tweet_results.legacy.full_text,
-            tweet_id_str:tweet.content.tweet_results.legacy.conversation_id_str,
-            handle:tweet.content.tweet_results.result.core.user_results.result.core.screen_name
+export async function HistoricRawTweetUpdating() {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
 
-        }
-        
-    const { data, error } = await supabase
-        .from('tweets_raw')
-        .upsert(formattedTweets, { onConflict: 'tweet_id', ignoreDuplicates: true });
+    const ingestionDir = path.join(__dirname, '../ingestion');
 
-    if (error) {
-        console.error("Error inserting tweets:", error);
-    }
+    // Get all files matching the pattern
+    const allFiles = await readdir(ingestionDir);
+    const matchingFiles = allFiles.filter(f => f.startsWith('reutersBiz_') && f.endsWith('.json'));
 
-    return { data, error, count: formattedTweets.length };
-    }
-    }
-    })
+    console.log(`Found ${matchingFiles.length} files:`, matchingFiles);
+
+    for (const file of matchingFiles) {
+        console.log(`Processing ${file}...`);
+        const raw = await readFile(path.join(ingestionDir, file), 'utf-8');
+        const data = JSON.parse(raw);
+        const instructions = data.data?.search_by_raw_query?.search_timeline?.timeline?.instructions[0]?.entries;
+
+if (!instructions) {
+    console.warn(`Skipping ${file} — unexpected structure`);
+    continue;
 }
+// $.data.search_by_raw_query.search_timeline.timeline.instructions.0.entries.0.content.itemContent.tweet_results.result.legacy.created_at
+       
+            for (const tweet of instructions) {
+                    if (!tweet.content?.itemContent?.tweet_results) continue;
+
+    const result = tweet.content.itemContent.tweet_results.result;
+
+    const formattedTweet = {
+        created_at_source: result.legacy.created_at,
+        text:              result.legacy.full_text,
+        tweet_id:          result.legacy.conversation_id_str,
+        handle:            result.core.user_results.result.core.screen_name
+    };
+
+              
+
+                const { error } = await supabase
+                    .from('tweets_raw')
+                    .upsert(formattedTweet, { onConflict: 'tweet_id', ignoreDuplicates: true });
+
+                if (error) console.error(`Error inserting tweet from ${file}:`, error);
+            }
+        
+
+        console.log(`Done processing ${file}`);
+    }
+}
+HistoricRawTweetUpdating();
